@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card mt-4 p-4 shadow">
+            <h3 class="text-center text-warning mb-4 fw-bold">REQUEST RESET</h3>
+            <form method="POST" action="{{ url_for('reset_request') }}">
+                <div class="mb-3"><label>Username</label><input type="text" name="username" class="form-control bg-dark text-light" required></div>
+                <div class="mb-3"><label>Email</label><input type="email" name="email" class="form-control bg-dark text-light" required></div>
+                <div class="mb-3"><label>New Password</label><input type="password" name="new_password" class="form-control bg-dark text-light" required></div>
+                <div class="mb-4"><label>Confirm Password</label><input type="password" name="confirm_password" class="form-control bg-dark text-light" required></div>
+                <button type="submit" class="btn btn-warning w-100 fw-bold mb-2">SUBMIT TICKET</button>
+                <a href="{{ url_for('login') }}" class="btn btn-secondary w-100">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

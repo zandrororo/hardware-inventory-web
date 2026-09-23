@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12 d-flex justify-content-between align-items-center">
+        <h4 class="text-success fw-bold">Total Stocks in Lab: {{ total_stocks }}</h4>
+        {% if session['role'] == 'ADMIN' %}
+            <a href="{{ url_for('export') }}" class="btn btn-success">Export Inventory Report</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+<!-- HARDWARE CATALOG -->
+    <div class="col-md-12 mb-4">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-3">
+                <h5 class="text-primary mb-0">Hardware Catalog</h5>
+                {% if session['role'] == 'ADMIN' %}
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal">+ Add New Item</button>
+                {% endif %}
+            </div>
+            
+            <!-- MAIN FORM PARA SA BORROW AT DELETE -->
+            <form method="POST" action="{{ url_for('borrow') if session['role'] == 'USER' else url_for('admin_delete') }}">
+                <table class="table table-dark table-hover mt-2">
+                    <thead>
+                        <tr>
+                            <th>Select</th>
+                            <th>ID</th>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th>Avail Qty</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            {% if session['role'] == 'USER' %}<th>Borrow Qty</th>{% endif %}
+                            {% if session['role'] == 'ADMIN' %}<th>Action</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td><input type="checkbox" name="{{ 'item_id' if session['role'] == 'USER' else 'item_ids' }}" value="{{ item[0] }}" class="form-check-input"></td>
+                            <td>{{ item[0] }}</td>
+                            <td>{{ item[1] }}</td>
+                            <td>{{ item[2] }}</td>
+                            <td>{{ item[3] }}</td>
+                            <td>₱{{ "%.2f"|format(item[4]) }}</td>
+                            <td>
+                                <!-- Dynamic Color Tagging -->
+                                {% if item[5] == 'High Stock' %}<span class="badge bg-success">High Stock</span>
+                                {% elif item[5] == 'Mid Stock' %}<span class="badge bg-warning text-dark">Mid Stock</span>
+                                {% elif item[5] == 'Low Stock' %}<span class="badge bg-danger">Low Stock</span>
+                                {% else %}<span class="badge bg-secondary">Out of Stock</span>{% endif %}
+                            </td>
+                            {% if session['role'] == 'USER' %}
+                            <!-- Mapapansin mo andito na yung quantity_{{ item[0] }} para sa multi-borrow -->
+                            <td><input type="number" name="quantity_{{ item[0] }}" min="1" max="{{ item[3] }}" value="1" class="form-control form-control-sm bg-dark text-light" style="width: 70px;"></td>
+                            {% endif %}
+                            {% if session['role'] == 'ADMIN' %}
+                            <td>
+                                <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editModal{{ item[0] }}">Edit</button>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if session['role'] == 'USER' %}
+                    <button type="submit" class="btn btn-warning fw-bold">Request Borrow</button>
+                {% else %}
+                    <button type="submit" class="btn btn-danger fw-bold">Delete Selected Item(s)</button>
+                {% endif %}
+            </form>
+
+            <!-- EDIT MODALS (NILABAS NA NATIN SA MAIN FORM PARA HINDI MAG-CONFLICT) -->
+            {% if session['role'] == 'ADMIN' %}
+                {% for item in items %}
+                <div class="modal fade" id="editModal{{ item[0] }}" tabindex="-1">
+                  <div class="modal-dialog">
+                    <div class="modal-content bg-dark text-light border-secondary">
+                      <form action="/admin/update" method="POST">
+                          <div class="modal-header border-secondary">
+                            <h5 class="modal-title text-info">Edit Item #{{ item[0] }}</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                          </div>
+                          <div class="modal-body">
+                              <input type="hidden" name="item_id" value="{{ item[0] }}">
+                              <div class="mb-3"><label>Item Name</label><input type="text" name="item_name" class="form-control bg-dark text-light" value="{{ item[1] }}" required></div>
+                              <div class="mb-3"><label>Category</label><input type="text" name="category" class="form-control bg-dark text-light" value="{{ item[2] }}" required></div>
+                              <div class="mb-3"><label>Quantity</label><input type="number" name="quantity" class="form-control bg-dark text-light" value="{{ item[3] }}" required></div>
+                              <div class="mb-3"><label>Unit Price (₱)</label><input type="number" step="0.01" name="unit_price" class="form-control bg-dark text-light" value="{{ item[4] }}" required></div>
+                          </div>
+                          <div class="modal-footer border-secondary">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                          </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Add Item Modal for Admin -->
+    {% if session['role'] == 'ADMIN' %}
+    <div class="modal fade" id="addItemModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light border-secondary">
+          <form action="{{ url_for('admin_add') }}" method="POST">
+              <div class="modal-header border-secondary">
+                <h5 class="modal-title text-success">Add New Hardware</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                  <div class="mb-3"><label>Item Name</label><input type="text" name="item_name" class="form-control bg-dark text-light" required></div>
+                  <div class="mb-3"><label>Category</label><input type="text" name="category" class="form-control bg-dark text-light" required></div>
+                  <div class="mb-3"><label>Quantity</label><input type="number" name="quantity" class="form-control bg-dark text-light" required></div>
+                  <div class="mb-3"><label>Unit Price (₱)</label><input type="number" step="0.01" name="unit_price" class="form-control bg-dark text-light" required></div>
+              </div>
+              <div class="modal-footer border-secondary">
+                <button type="submit" class="btn btn-success">Add Item</button>
+              </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- USER PANELS -->
+    {% if session['role'] == 'USER' %}
+    <div class="col-md-7 mb-4">
+        <div class="card p-3 h-100">
+            <h5 class="text-warning border-bottom pb-2">My Borrowed Items</h5>
+            <form method="POST" action="{{ url_for('return_request') }}">
+                <table class="table table-dark">
+                    <thead><tr><th>Select</th><th>Log ID</th><th>Item Name</th><th>Qty</th><th>Date</th></tr></thead>
+                    <tbody>
+                        {% for loan in active_loans %}
+                        <tr>
+                            <td><input type="checkbox" name="loan_ids" value="{{ loan[0] }}" class="form-check-input"></td>
+                            <td>{{ loan[0] }}</td><td>{{ loan[1] }}</td><td>{{ loan[2] }}</td><td>{{ loan[3] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="submit" class="btn btn-success fw-bold">Request Return</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ADMIN PANELS -->
+    {% if session['role'] == 'ADMIN' %}
+    <div class="col-md-6 mb-4">
+        <div class="card p-3 h-100">
+            <h5 class="text-warning border-bottom pb-2">Pending Borrow Requests</h5>
+            <form method="POST" action="{{ url_for('admin_borrow_action') }}">
+                <table class="table table-dark">
+                    <thead><tr><th>Select</th><th>User</th><th>Item</th><th>Qty</th></tr></thead>
+                    <tbody>
+                        {% for req in pending_borrows %}
+                        <tr>
+                            <td><input type="checkbox" name="loan_ids" value="{{ req[0] }}" class="form-check-input"></td>
+                            <td>{{ req[1] }}</td><td>{{ req[2] }}</td><td>{{ req[3] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="submit" name="action" value="approve" class="btn btn-success fw-bold me-2">Approve Borrow</button>
+                <button type="submit" name="action" value="reject" class="btn btn-danger fw-bold">Reject</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card p-3 h-100">
+            <h5 class="text-info border-bottom pb-2">Pending Returns</h5>
+            <form method="POST" action="{{ url_for('admin_return_action') }}">
+                <table class="table table-dark">
+                    <thead><tr><th>Select</th><th>User</th><th>Item</th><th>Qty</th></tr></thead>
+                    <tbody>
+                        {% for ret in pending_returns %}
+                        <tr>
+                            <td><input type="checkbox" name="loan_ids" value="{{ ret[0] }}" class="form-check-input"></td>
+                            <td>{{ ret[1] }}</td><td>{{ ret[2] }}</td><td>{{ ret[3] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="submit" name="action" value="approve" class="btn btn-success fw-bold me-2">Approve & Restock</button>
+                <button type="submit" name="action" value="reject" class="btn btn-danger fw-bold">Reject Return</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ACCOUNT UNLOCK REQUESTS -->
+    <div class="col-md-12 mb-4">
+        <div class="card p-3">
+            <h5 class="text-danger border-bottom pb-2">Pending Password Reset / Unlock Requests</h5>
+            <form method="POST" action="{{ url_for('admin_reset_action') }}">
+                <table class="table table-dark">
+                    <thead><tr><th>Select</th><th>Req ID</th><th>Username</th><th>Email</th><th>Status</th></tr></thead>
+                    <tbody>
+                        {% for req in pending_resets %}
+                        <tr>
+                            <td><input type="checkbox" name="request_ids" value="{{ req[0] }}" class="form-check-input"></td>
+                            <td>{{ req[0] }}</td><td>{{ req[1] }}</td><td>{{ req[2] }}</td><td>{{ req[3] }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center text-muted">No pending requests</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="submit" name="action" value="approve" class="btn btn-success fw-bold me-2">Approve & Unlock</button>
+                <button type="submit" name="action" value="reject" class="btn btn-danger fw-bold">Reject</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- USER PROFILE & SECURITY -->
+    <div class="col-md-{% if session['role'] == 'USER' %}5{% else %}12{% endif %} mb-4">
+        <div class="card p-3 h-100">
+            <h5 class="text-purple border-bottom pb-2" style="color: #A371F7;">My Profile & Security</h5>
+            <form method="POST" action="{{ url_for('change_password') }}">
+                <div class="mb-3">
+                    <label>Current Password</label>
+                    <input type="password" name="old_password" class="form-control bg-dark text-light" required>
+                </div>
+                <div class="mb-3">
+                    <label>New Password</label>
+                    <input type="password" name="new_password" class="form-control bg-dark text-light" required>
+                </div>
+                <button type="submit" class="btn btn-purple fw-bold" style="background-color: #8952DB; color: white;">Update Security</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPTS PARA GUMANA ANG MODALS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- SCRIPT PARA MAGING CLICKABLE ANG BUONG ROW NG TABLE -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Kunin lahat ng rows sa loob ng table body
+        const tableRows = document.querySelectorAll('table tbody tr');
+        
+        tableRows.forEach(row => {
+            // Gawing 'pointer' (kamay) ang cursor kapag naka-hover sa row
+            row.style.cursor = 'pointer';
+            
+            row.addEventListener('click', function(e) {
+                // Para hindi mag-double trigger kapag mismong checkbox, textbox, o button ang kinlick
+                const isInteractiveElement = ['INPUT', 'BUTTON', 'A'].includes(e.target.tagName) || e.target.closest('button');
+                
+                if (!isInteractiveElement) {
+                    // Hanapin ang checkbox sa loob ng row na ito
+                    const checkbox = this.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        // Baligtarin ang state ng checkbox (check/uncheck)
+                        checkbox.checked = !checkbox.checked;
+                    }
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
