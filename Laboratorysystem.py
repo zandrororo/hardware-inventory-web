@@ -1091,7 +1091,7 @@ class AuthController:
     def register_user(username, email, password, role="USER"):
         try:
             h = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode()
-            conn = sqlite3.connect(DB_NAME)
+            conn = sqlite3.connect(DB_NAME, timeout=10)
             conn.execute("INSERT INTO users (username, email, password_hash, role) VALUES (?,?,?,?)", (username, email, h, role))
             conn.commit(); conn.close(); return True, "Registered"
         except Exception as e:
