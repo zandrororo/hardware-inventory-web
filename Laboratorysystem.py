@@ -1,5 +1,4 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
+#from tkinter import ttk, messagebox
 import sqlite3
 import bcrypt
 import os
