@@ -1094,7 +1094,9 @@ class AuthController:
             conn = sqlite3.connect(DB_NAME)
             conn.execute("INSERT INTO users (username, email, password_hash, role) VALUES (?,?,?,?)", (username, email, h, role))
             conn.commit(); conn.close(); return True, "Registered"
-        except: return False, "Error"
+        except Exception as e:
+            print(f"Database Error on Register: {e}") 
+            return False, f"Error: {e}"
         
     @staticmethod
     def submit_password_reset_request(username, email, new_password): return True, "Requested"
