@@ -45,7 +45,10 @@ from Laboratorysystem import (
 # ==========================================================
 
 app = Flask(__name__)
-
+try:
+    init_db()
+except Exception as e:
+    print(f"Init DB notice: {e}")
 # Secret key is required for Flask sessions.
 app.secret_key = os.environ.get(
     "SECRET_KEY",
@@ -130,12 +133,21 @@ def register():
 
     if not username or not email or not password:
         flash("All registration fields are required.", "danger")
+        return redirect(url_for("register"))
+
+    try:
+        # Ito yung sasalo sa crash para kita natin ang totoong error
+        ok, msg = AuthController.register_user(
+            username,
+            email,
+            password,
+            role=role
+        )
+        flash(msg, "success" if ok else "warning")
         return redirect(url_for("login"))
-
-    ok, msg = AuthController.register_user(username, email, password, role=role)
-
-    flash(msg, "success" if ok else "warning")
-    return redirect(url_for("login"))
+    except Exception as err:
+        flash(f"Database Error: {err}", "danger")
+        return redirect(url_for("register"))
 
 # ==========================================================
 # 9. PASSWORD RESET REQUEST
