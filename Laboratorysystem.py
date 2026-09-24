@@ -1176,3 +1176,13 @@ class InventoryController:
                 item_id, qty = cursor.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=?", (lid,)).fetchone()
                 cursor.execute("UPDATE hardware SET quantity = quantity + ? WHERE item_id=?", (qty, item_id))
         conn.commit(); conn.close(); return True, "Processed"
+@staticmethod
+    def get_admin_action_history():
+        # Kinukuha ang records mula sa "loans" table base sa Lab 8 database structure
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        # Kukunin lang yung mga approved na borrows at returns
+        res = conn.execute("SELECT loan_id, username, item_name, quantity, status, borrow_date FROM loans WHERE status IN ('BORROWED', 'RETURNED') ORDER BY loan_id DESC").fetchall()
+        conn.close()
+        return res
