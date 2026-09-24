@@ -1,5 +1,5 @@
 Flask
 bcrypt
-psycopg2-binary
+psycopg-binary
 python-dotenv
 gunicorn==23.0.0
