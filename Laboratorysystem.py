@@ -873,7 +873,7 @@ class InventoryWindow:
         self.e_category.delete(0, tk.END); self.e_category.insert(0, item_data[3])
         self.e_qty.delete(0, tk.END); self.e_qty.insert(0, item_data[4])
         self.e_price.delete(0, tk.END); self.e_price.insert(0, item_data[5].replace("₱", "").replace(",", ""))
-        self.form_label.set(" [!] MODIFYING RECORD ID: " + self.editing_id + " ")
+        self.form_label.set(" [!] MODIFYING RECORD ID: " + str(self.editing_id) + " ")
         self.btn_save.config(text=">> UPDATE ITEM <<", bg=ACCENT_BLUE)
         self.btn_cancel_edit.grid(row=1, column=5, padx=5, pady=10)
 
@@ -1010,33 +1010,47 @@ if __name__ == "__main__":
 # ==========================================
 # SUPABASE POSTGRESQL CONTROLLERS (WEB)
 # ==========================================
+import os
+import psycopg2
+import bcrypt
+
 class AuthController:
     @staticmethod
+    def get_db_connection():
+        return psycopg2.connect(os.environ.get("DATABASE_URL"))
+
+    @staticmethod
     def login_user(username, password):
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        row = conn.execute("SELECT id, password_hash, role, failed_attempts, is_locked, email FROM users WHERE username=%s", (username,)).fetchone()
-        conn.close()
-        if not row: return False, "Invalid", None, False, None
-        if row[4]: return False, "Locked", None, True, None
-        if bcrypt.checkpw(password.encode('utf-8'), row[1].encode('utf-8')): return True, "Success", row[2], False, row[5]
-        return False, "Invalid pass", None, False, None
+        try:
+            conn = AuthController.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, password_hash, role, failed_attempts, is_locked, email FROM users WHERE username=%s", (username,))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if not row: return False, "Invalid username or password", None, False, None
+            if row[4]: return False, "Account is Locked", None, True, None
+            
+            if bcrypt.checkpw(password.encode('utf-8'), row[1].encode('utf-8')): 
+                return True, "Success", row[2], False, row[5]
+                
+            return False, "Invalid password", None, False, None
+        except Exception as e:
+            print("DB Error:", e)
+            return False, "Database connection error", None, False, None
         
     @staticmethod
     def register_user(username, email, password, role="USER"):
-        import psycopg
-        import os
         try:
             h = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode()
-            conn = psycopg.connect(os.getenv("DATABASE_URL"))
-            conn.execute("INSERT INTO users (username, email, password_hash, role) VALUES (%s,%s,%s,%s)", (username, email, h, role))
+            conn = AuthController.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO users (username, email, password_hash, role) VALUES (%s,%s,%s,%s)", (username, email, h, role))
             conn.commit()
             conn.close()
-            return True, "Registered"
-        except Exception as e:
-            print(f"Database Error on Register: {e}") 
-            return False, f"Error: {e}"
+            return True, "Registered successfully"
+        except Exception as e: 
+            return False, f"Registration Error: {e}"
             
     @staticmethod
     def submit_password_reset_request(username, email, new_password): return True, "Requested"
@@ -1049,13 +1063,19 @@ class AuthController:
 
 class InventoryController:
     @staticmethod
+    def get_db_connection():
+        return psycopg2.connect(os.environ.get("DATABASE_URL"))
+
+    @staticmethod
     def get_all_items(search_text="", category="ALL"):
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        res = conn.execute("SELECT * FROM hardware").fetchall()
-        conn.close()
-        return res
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM hardware")
+            res = cursor.fetchall()
+            conn.close()
+            return res
+        except: return []
         
     @staticmethod
     def get_categories(): return []
@@ -1063,10 +1083,36 @@ class InventoryController:
     def get_user_loan_history(u): return []
     @staticmethod
     def get_all_loans_history(): return []
+    
     @staticmethod
-    def add_item(n, c, q, p): return True, "Added"
+    def add_item(n, c, q, p): 
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            q_int = int(q)
+            if q_int == 0: status = 'Out of Stock'
+            elif 1 <= q_int <= 5: status = 'Low Stock'
+            elif 6 <= q_int <= 10: status = 'Mid Stock'
+            else: status = 'High Stock'
+            
+            cursor.execute("INSERT INTO hardware (item_name, category, quantity, unit_price, status) VALUES (%s, %s, %s, %s, %s)", (n, c, q_int, float(p), status))
+            conn.commit()
+            conn.close()
+            return True, "Added"
+        except Exception as e: return False, str(e)
+
     @staticmethod
-    def delete_bulk_items(ids): return True, "Deleted"
+    def delete_bulk_items(ids): 
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            for i in ids:
+                cursor.execute("DELETE FROM hardware WHERE item_id=%s", (i,))
+            conn.commit()
+            conn.close()
+            return True, "Deleted"
+        except Exception as e: return False, str(e)
+        
     @staticmethod
     def export_to_csv(u): return True, "Exported"
     @staticmethod
@@ -1074,90 +1120,111 @@ class InventoryController:
 
     @staticmethod
     def borrow_item(u, i, q):
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        name = conn.execute("SELECT item_name FROM hardware WHERE item_id=%s", (i,)).fetchone()[0]
-        conn.execute("INSERT INTO borrow_logs (item_id, item_name, username, borrowed_qty, borrow_date, status) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, 'Pending')", (i, name, u, q))
-        conn.commit()
-        conn.close()
-        return True, "Requested"
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT item_name FROM hardware WHERE item_id=%s", (i,))
+            row = cursor.fetchone()
+            if not row:
+                conn.close()
+                return False, "Item not found"
+            name = row[0]
+            cursor.execute("INSERT INTO borrow_logs (item_id, item_name, username, borrowed_qty, borrow_date, status) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, 'Pending')", (i, name, u, q))
+            conn.commit()
+            conn.close()
+            return True, "Requested"
+        except Exception as e: return False, str(e)
 
     @staticmethod
     def get_pending_borrows():
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        res = conn.execute("SELECT log_id, username, item_name, borrowed_qty FROM borrow_logs WHERE status='Pending'").fetchall()
-        conn.close()
-        return res
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT log_id, username, item_name, borrowed_qty FROM borrow_logs WHERE status='Pending'")
+            res = cursor.fetchall()
+            conn.close()
+            return res
+        except: return []
 
     @staticmethod
     def process_bulk_borrows(ids, approve):
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        status = 'Borrowed' if approve else 'Rejected'
-        for lid in ids:
-            conn.execute("UPDATE borrow_logs SET status=%s WHERE log_id=%s", (status, lid))
-            if approve:
-                row = conn.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=%s", (lid,)).fetchone()
-                if row:
-                    conn.execute("UPDATE hardware SET quantity = quantity - %s WHERE item_id=%s", (row[1], row[0]))
-        conn.commit()
-        conn.close()
-        return True, "Processed"
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            status = 'Borrowed' if approve else 'Rejected'
+            for lid in ids:
+                cursor.execute("UPDATE borrow_logs SET status=%s WHERE log_id=%s", (status, lid))
+                if approve:
+                    cursor.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=%s", (lid,))
+                    row = cursor.fetchone()
+                    if row:
+                        item_id, qty = row
+                        cursor.execute("UPDATE hardware SET quantity = quantity - %s WHERE item_id=%s", (qty, item_id))
+            conn.commit()
+            conn.close()
+            return True, "Processed"
+        except Exception as e: return False, str(e)
 
     @staticmethod
     def get_user_active_loans(u):
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        res = conn.execute("SELECT log_id, item_name, borrowed_qty, borrow_date FROM borrow_logs WHERE username=%s AND status='Borrowed'", (u,)).fetchall()
-        conn.close()
-        return res
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT log_id, item_name, borrowed_qty, borrow_date FROM borrow_logs WHERE username=%s AND status='Borrowed'", (u,))
+            res = cursor.fetchall()
+            conn.close()
+            return res
+        except: return []
 
     @staticmethod
     def request_bulk_item_returns(ids):
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        for lid in ids: 
-            conn.execute("UPDATE borrow_logs SET status='RETURN_PENDING' WHERE log_id=%s", (lid,))
-        conn.commit()
-        conn.close()
-        return True, "Return Requested"
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            for lid in ids: 
+                cursor.execute("UPDATE borrow_logs SET status='RETURN_PENDING' WHERE log_id=%s", (lid,))
+            conn.commit()
+            conn.close()
+            return True, "Return Requested"
+        except: return False, "Error"
 
     @staticmethod
     def get_pending_returns():
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        res = conn.execute("SELECT log_id, username, item_name, borrowed_qty FROM borrow_logs WHERE status='RETURN_PENDING'").fetchall()
-        conn.close()
-        return res
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT log_id, username, item_name, borrowed_qty FROM borrow_logs WHERE status='RETURN_PENDING'")
+            res = cursor.fetchall()
+            conn.close()
+            return res
+        except: return []
 
     @staticmethod
     def process_bulk_returns(ids, approve):
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        status = 'Returned' if approve else 'Borrowed'
-        for lid in ids:
-            conn.execute("UPDATE borrow_logs SET status=%s WHERE log_id=%s", (status, lid))
-            if approve:
-                row = conn.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=%s", (lid,)).fetchone()
-                if row:
-                    conn.execute("UPDATE hardware SET quantity = quantity + %s WHERE item_id=%s", (row[1], row[0]))
-        conn.commit()
-        conn.close()
-        return True, "Processed"
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            status = 'Returned' if approve else 'Borrowed'
+            for lid in ids:
+                cursor.execute("UPDATE borrow_logs SET status=%s WHERE log_id=%s", (status, lid))
+                if approve:
+                    cursor.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=%s", (lid,))
+                    row = cursor.fetchone()
+                    if row:
+                        item_id, qty = row
+                        cursor.execute("UPDATE hardware SET quantity = quantity + %s WHERE item_id=%s", (qty, item_id))
+            conn.commit()
+            conn.close()
+            return True, "Processed"
+        except: return False, "Error"
 
     @staticmethod
     def get_admin_action_history():
-        import psycopg
-        import os
-        conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        res = conn.execute("SELECT log_id, username, item_name, borrowed_qty, status, borrow_date FROM borrow_logs WHERE status IN ('Borrowed', 'Returned', 'Rejected') ORDER BY log_id DESC").fetchall()
-        conn.close()
-        return res
+        try:
+            conn = InventoryController.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT log_id, username, item_name, borrowed_qty, status, borrow_date FROM borrow_logs WHERE status IN ('Borrowed', 'Returned', 'Rejected') ORDER BY log_id DESC")
+            res = cursor.fetchall()
+            conn.close()
+            return res
+        except: return []
