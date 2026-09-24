@@ -1176,7 +1176,7 @@ class InventoryController:
                 item_id, qty = cursor.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=?", (lid,)).fetchone()
                 cursor.execute("UPDATE hardware SET quantity = quantity + ? WHERE item_id=?", (qty, item_id))
         conn.commit(); conn.close(); return True, "Processed"
-@staticmethod
+    @staticmethod
     def get_admin_action_history():
         # Kinukuha ang records mula sa "loans" table base sa Lab 8 database structure
         import psycopg
