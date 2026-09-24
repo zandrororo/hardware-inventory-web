@@ -1,5 +1,6 @@
 Flask
 bcrypt
+psycopg
 psycopg-binary
 psycopg2-binary
 python-dotenv
