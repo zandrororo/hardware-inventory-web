@@ -387,7 +387,21 @@ def dashboard():
         search_text=search,
         category=category
     )
-
+if session.get("role") == "ADMIN":
+            items = InventoryController.get_all_items()
+            pending_borrows = InventoryController.get_pending_borrows()
+            pending_returns = InventoryController.get_pending_returns()
+            
+            # IDAGDAG ITO PARA SA HISTORY:
+            admin_history = InventoryController.get_admin_action_history()
+            
+            return render_template(
+                "dashboard.html",
+                items=items,
+                pending_borrows=pending_borrows,
+                pending_returns=pending_returns,
+                admin_history=admin_history # IDAGDAG DIN ITO SA RENDER TEMPLATE
+            )
     # Get all available categories.
     categories = InventoryController.get_categories()
     # ======================================================
