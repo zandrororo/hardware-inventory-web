@@ -1,4 +1,13 @@
-#from tkinter import ttk, messagebox
+try:
+    import tkinter as tk
+    from tkinter import messagebox, ttk
+    TKINTER_AVAILABLE = True
+except ImportError:
+    tk = None
+    messagebox = None
+    ttk = None
+    TKINTER_AVAILABLE = False
+
 import sqlite3
 import bcrypt
 import os
@@ -608,11 +617,10 @@ class InventoryWindow:
         
         self.tree.bind("<ButtonPress-1>", self.toggle_catalog_check)
         
-        # UPDATED DYNAMIC COLOR TAGS FOR NEW STOCK LOGIC
-        self.tree.tag_configure("High Stock", background="#004A00", foreground="white") # Green
-        self.tree.tag_configure("Mid Stock", background="#7A6300", foreground="white")  # Yellow
-        self.tree.tag_configure("Low Stock", background=ACCENT_RED, foreground="white") # Red
-        self.tree.tag_configure("Out of Stock", background="#4A0000", foreground="#8B949E") # Dark Red/Gray
+        self.tree.tag_configure("High Stock", background="#004A00", foreground="white")
+        self.tree.tag_configure("Mid Stock", background="#7A6300", foreground="white") 
+        self.tree.tag_configure("Low Stock", background=ACCENT_RED, foreground="white")
+        self.tree.tag_configure("Out of Stock", background="#4A0000", foreground="#8B949E")
 
         action_frame = tk.Frame(self.tab_catalog, bg=BG_COLOR)
         action_frame.pack(fill="x", padx=15, pady=10)
@@ -699,14 +707,12 @@ class InventoryWindow:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM hardware WHERE item_name LIKE ?", ('%' + query + '%',))
             for row in cursor.fetchall():
-                # Dynamically fetch actual updated status on search
                 actual_status = self.compute_status(row[3])
                 formatted_row = ("☐", row[0], row[1], row[2], row[3], f"₱{row[4]:.2f}", actual_status)
                 self.tree.insert("", tk.END, values=formatted_row, tags=(actual_status,))
         finally:
             if conn: conn.close()
 
-    # --- UPDATED STOCK LOGIC ---
     def compute_status(self, qty):
         if qty == 0: return 'Out of Stock'
         elif 1 <= qty <= 5: return 'Low Stock'
@@ -732,7 +738,6 @@ class InventoryWindow:
             conn = sqlite3.connect(DB_NAME, timeout=5)
             cursor = conn.cursor()
             
-            # This automatically updates old data statuses based on the new logic behind the scenes
             cursor.execute("SELECT * FROM hardware")
             for row in cursor.fetchall():
                 item_id, qty, db_status = row[0], row[3], row[5]
@@ -995,92 +1000,23 @@ class AppController:
 
     def show_profile(self, username, role):
         self.clear_window()
-        self.root.geometry("1000x750") # Profile matches Inventory size seamlessly
+        self.root.geometry("1000x750") 
         ProfileView(self.root, username, role, lambda: self.show_inventory(username, role))
-
-# ==========================================
-# 7. INLINE PROFILE / SECURITY COMPONENT
-# ==========================================
-class ProfileView:
-    def __init__(self, root, username, role, on_back_callback):
-        self.root = root
-        self.username = username
-        self.role = role
-        self.on_back = on_back_callback
-        
-        self.root.title(f"Engineering Asset Tracking System - Profile: {self.username}")
-        self.root.configure(bg=BG_COLOR)
-        
-        self.build_ui()
-
-    def build_ui(self):
-        main_frame = tk.Frame(self.root, bg=BG_COLOR)
-        main_frame.place(relx=0.5, rely=0.45, anchor="center")
-        
-        tk.Label(main_frame, text="[ PROFILE & SECURITY ]", font=("Consolas", 18, "bold"), bg=BG_COLOR, fg=ACCENT_PURPLE).pack(pady=(0, 20))
-        
-        info_frame = tk.Frame(main_frame, bg=PANEL_BG, padx=25, pady=20, relief="ridge", bd=1)
-        info_frame.pack(fill="x", pady=10)
-        
-        tk.Label(info_frame, text=f"Account Name : {self.username}", font=("Consolas", 12), bg=PANEL_BG, fg=TEXT_COLOR).pack(anchor="w")
-        tk.Label(info_frame, text=f"Assigned Role: {self.role}", font=("Consolas", 12), bg=PANEL_BG, fg=TEXT_COLOR).pack(anchor="w", pady=(10, 0))
-        
-        tk.Label(main_frame, text="-- Change Password --", font=("Consolas", 12, "bold"), bg=BG_COLOR, fg=ACCENT_BLUE).pack(pady=(30, 10))
-        
-        form_frame = tk.Frame(main_frame, bg=BG_COLOR)
-        form_frame.pack()
-        
-        tk.Label(form_frame, text="Current Pass:", font=("Consolas", 11), bg=BG_COLOR, fg=TEXT_COLOR).grid(row=0, column=0, sticky="e", padx=10, pady=10)
-        self.entry_curr = ttk.Entry(form_frame, show="*", width=30, font=("Consolas", 11), style="Normal.TEntry")
-        self.entry_curr.grid(row=0, column=1, padx=10, pady=10)
-        
-        tk.Label(form_frame, text="New Password:", font=("Consolas", 11), bg=BG_COLOR, fg=TEXT_COLOR).grid(row=1, column=0, sticky="e", padx=10, pady=10)
-        self.entry_new = ttk.Entry(form_frame, show="*", width=30, font=("Consolas", 11), style="Normal.TEntry")
-        self.entry_new.grid(row=1, column=1, padx=10, pady=10)
-        
-        tk.Label(form_frame, text="Confirm Pass:", font=("Consolas", 11), bg=BG_COLOR, fg=TEXT_COLOR).grid(row=2, column=0, sticky="e", padx=10, pady=10)
-        self.entry_conf = ttk.Entry(form_frame, show="*", width=30, font=("Consolas", 11), style="Normal.TEntry")
-        self.entry_conf.grid(row=2, column=1, padx=10, pady=10)
-        
-        btn_frame = tk.Frame(main_frame, bg=BG_COLOR)
-        btn_frame.pack(pady=30)
-        
-        custom_button(btn_frame, "<< BACK TO INVENTORY", self.on_back, "#555555", "#777777", width=22).pack(side="left", padx=10)
-        custom_button(btn_frame, "UPDATE SECURITY", self.change_password, ACCENT_GREEN, "#2EA043", width=20).pack(side="left", padx=10)
-
-    def change_password(self):
-        curr_p, new_p, conf_p = self.entry_curr.get().strip(), self.entry_new.get().strip(), self.entry_conf.get().strip()
-        if new_p != conf_p:
-            messagebox.showerror("Error", "New passwords do not match.")
-            return
-        if len(new_p) < 8 or not re.search(r'[A-Z]', new_p) or not re.search(r'\d', new_p):
-            messagebox.showwarning("Validation Error", "Password must have at least 8 chars, 1 uppercase, 1 number.")
-            return
-        conn = None
-        try:
-            conn = sqlite3.connect(DB_NAME, timeout=5)
-            cursor = conn.cursor()
-            cursor.execute("SELECT password_hash FROM users WHERE username=?", (self.username,))
-            row = cursor.fetchone()
-            if row and bcrypt.checkpw(curr_p.encode('utf-8'), row[0].encode('utf-8')):
-                hashed_new = bcrypt.hashpw(new_p.encode('utf-8'), bcrypt.gensalt())
-                cursor.execute("UPDATE users SET password_hash=? WHERE username=?", (hashed_new.decode('utf-8'), self.username))
-                conn.commit()
-                messagebox.showinfo("Success", "Password updated successfully!")
-                self.on_back()
-            else:
-                messagebox.showerror("Auth Error", "Incorrect Current Password.")
-        finally:
-            if conn: conn.close()
 
 if __name__ == "__main__":
     #AppController()
     pass
+
+# ==========================================
+# SUPABASE POSTGRESQL CONTROLLERS (WEB)
+# ==========================================
 class AuthController:
     @staticmethod
     def login_user(username, password):
-        conn = sqlite3.connect(DB_NAME); cursor = conn.cursor()
-        row = cursor.execute("SELECT id, password_hash, role, failed_attempts, is_locked, email FROM users WHERE username=?", (username,)).fetchone()
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        row = conn.execute("SELECT id, password_hash, role, failed_attempts, is_locked, email FROM users WHERE username=%s", (username,)).fetchone()
         conn.close()
         if not row: return False, "Invalid", None, False, None
         if row[4]: return False, "Locked", None, True, None
@@ -1089,15 +1025,19 @@ class AuthController:
         
     @staticmethod
     def register_user(username, email, password, role="USER"):
+        import psycopg
+        import os
         try:
             h = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode()
-            conn = sqlite3.connect(DB_NAME, timeout=10)
-            conn.execute("INSERT INTO users (username, email, password_hash, role) VALUES (?,?,?,?)", (username, email, h, role))
-            conn.commit(); conn.close(); return True, "Registered"
+            conn = psycopg.connect(os.getenv("DATABASE_URL"))
+            conn.execute("INSERT INTO users (username, email, password_hash, role) VALUES (%s,%s,%s,%s)", (username, email, h, role))
+            conn.commit()
+            conn.close()
+            return True, "Registered"
         except Exception as e:
             print(f"Database Error on Register: {e}") 
             return False, f"Error: {e}"
-        
+            
     @staticmethod
     def submit_password_reset_request(username, email, new_password): return True, "Requested"
     @staticmethod
@@ -1110,8 +1050,13 @@ class AuthController:
 class InventoryController:
     @staticmethod
     def get_all_items(search_text="", category="ALL"):
-        conn = sqlite3.connect(DB_NAME); res = conn.execute("SELECT * FROM hardware").fetchall()
-        conn.close(); return res
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        res = conn.execute("SELECT * FROM hardware").fetchall()
+        conn.close()
+        return res
+        
     @staticmethod
     def get_categories(): return []
     @staticmethod
@@ -1129,60 +1074,90 @@ class InventoryController:
 
     @staticmethod
     def borrow_item(u, i, q):
-        conn = sqlite3.connect(DB_NAME); cursor = conn.cursor()
-        name = cursor.execute("SELECT item_name FROM hardware WHERE item_id=?", (i,)).fetchone()[0]
-        cursor.execute("INSERT INTO borrow_logs (item_id, item_name, username, borrowed_qty, borrow_date, status) VALUES (?, ?, ?, ?, datetime('now'), 'Pending')", (i, name, u, q))
-        conn.commit(); conn.close(); return True, "Requested"
-
-    @staticmethod
-    def get_pending_borrows():
-        conn = sqlite3.connect(DB_NAME); res = conn.execute("SELECT log_id, username, item_name, borrowed_qty FROM borrow_logs WHERE status='Pending'").fetchall()
-        conn.close(); return res
-
-    @staticmethod
-    def process_bulk_borrows(ids, approve):
-        conn = sqlite3.connect(DB_NAME); cursor = conn.cursor()
-        status = 'Borrowed' if approve else 'Rejected'
-        for lid in ids:
-            cursor.execute("UPDATE borrow_logs SET status=? WHERE log_id=?", (status, lid))
-            if approve:
-                item_id, qty = cursor.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=?", (lid,)).fetchone()
-                cursor.execute("UPDATE hardware SET quantity = quantity - ? WHERE item_id=?", (qty, item_id))
-        conn.commit(); conn.close(); return True, "Processed"
-
-    @staticmethod
-    def get_user_active_loans(u):
-        conn = sqlite3.connect(DB_NAME); res = conn.execute("SELECT log_id, item_name, borrowed_qty, borrow_date FROM borrow_logs WHERE username=? AND status='Borrowed'", (u,)).fetchall()
-        conn.close(); return res
-
-    @staticmethod
-    def request_bulk_item_returns(ids):
-        conn = sqlite3.connect(DB_NAME); cursor = conn.cursor()
-        for lid in ids: cursor.execute("UPDATE borrow_logs SET status='RETURN_PENDING' WHERE log_id=?", (lid,))
-        conn.commit(); conn.close(); return True, "Return Requested"
-
-    @staticmethod
-    def get_pending_returns():
-        conn = sqlite3.connect(DB_NAME); res = conn.execute("SELECT log_id, username, item_name, borrowed_qty FROM borrow_logs WHERE status='RETURN_PENDING'").fetchall()
-        conn.close(); return res
-
-    @staticmethod
-    def process_bulk_returns(ids, approve):
-        conn = sqlite3.connect(DB_NAME); cursor = conn.cursor()
-        status = 'Returned' if approve else 'Borrowed'
-        for lid in ids:
-            cursor.execute("UPDATE borrow_logs SET status=? WHERE log_id=?", (status, lid))
-            if approve:
-                item_id, qty = cursor.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=?", (lid,)).fetchone()
-                cursor.execute("UPDATE hardware SET quantity = quantity + ? WHERE item_id=?", (qty, item_id))
-        conn.commit(); conn.close(); return True, "Processed"
-    @staticmethod
-    def get_admin_action_history():
-        # Kinukuha ang records mula sa "loans" table base sa Lab 8 database structure
         import psycopg
         import os
         conn = psycopg.connect(os.getenv("DATABASE_URL"))
-        # Kukunin lang yung mga approved na borrows at returns
-        res = conn.execute("SELECT loan_id, username, item_name, quantity, status, borrow_date FROM loans WHERE status IN ('BORROWED', 'RETURNED') ORDER BY loan_id DESC").fetchall()
+        name = conn.execute("SELECT item_name FROM hardware WHERE item_id=%s", (i,)).fetchone()[0]
+        conn.execute("INSERT INTO borrow_logs (item_id, item_name, username, borrowed_qty, borrow_date, status) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, 'Pending')", (i, name, u, q))
+        conn.commit()
+        conn.close()
+        return True, "Requested"
+
+    @staticmethod
+    def get_pending_borrows():
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        res = conn.execute("SELECT log_id, username, item_name, borrowed_qty FROM borrow_logs WHERE status='Pending'").fetchall()
+        conn.close()
+        return res
+
+    @staticmethod
+    def process_bulk_borrows(ids, approve):
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        status = 'Borrowed' if approve else 'Rejected'
+        for lid in ids:
+            conn.execute("UPDATE borrow_logs SET status=%s WHERE log_id=%s", (status, lid))
+            if approve:
+                row = conn.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=%s", (lid,)).fetchone()
+                if row:
+                    conn.execute("UPDATE hardware SET quantity = quantity - %s WHERE item_id=%s", (row[1], row[0]))
+        conn.commit()
+        conn.close()
+        return True, "Processed"
+
+    @staticmethod
+    def get_user_active_loans(u):
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        res = conn.execute("SELECT log_id, item_name, borrowed_qty, borrow_date FROM borrow_logs WHERE username=%s AND status='Borrowed'", (u,)).fetchall()
+        conn.close()
+        return res
+
+    @staticmethod
+    def request_bulk_item_returns(ids):
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        for lid in ids: 
+            conn.execute("UPDATE borrow_logs SET status='RETURN_PENDING' WHERE log_id=%s", (lid,))
+        conn.commit()
+        conn.close()
+        return True, "Return Requested"
+
+    @staticmethod
+    def get_pending_returns():
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        res = conn.execute("SELECT log_id, username, item_name, borrowed_qty FROM borrow_logs WHERE status='RETURN_PENDING'").fetchall()
+        conn.close()
+        return res
+
+    @staticmethod
+    def process_bulk_returns(ids, approve):
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        status = 'Returned' if approve else 'Borrowed'
+        for lid in ids:
+            conn.execute("UPDATE borrow_logs SET status=%s WHERE log_id=%s", (status, lid))
+            if approve:
+                row = conn.execute("SELECT item_id, borrowed_qty FROM borrow_logs WHERE log_id=%s", (lid,)).fetchone()
+                if row:
+                    conn.execute("UPDATE hardware SET quantity = quantity + %s WHERE item_id=%s", (row[1], row[0]))
+        conn.commit()
+        conn.close()
+        return True, "Processed"
+
+    @staticmethod
+    def get_admin_action_history():
+        import psycopg
+        import os
+        conn = psycopg.connect(os.getenv("DATABASE_URL"))
+        res = conn.execute("SELECT log_id, username, item_name, borrowed_qty, status, borrow_date FROM borrow_logs WHERE status IN ('Borrowed', 'Returned', 'Rejected') ORDER BY log_id DESC").fetchall()
         conn.close()
         return res
