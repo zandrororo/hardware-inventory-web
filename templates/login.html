@@ -11,7 +11,11 @@
                 </div>
                 <div class="mb-4">
                     <label>Password</label>
-                    <input type="password" name="password" class="form-control bg-dark text-light" required>
+                    <input type="password" name="password" id="password" class="form-control bg-dark text-light" required>
+                    <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+    <input type="checkbox" id="showPassword" onclick="togglePassword()" style="cursor: pointer;">
+    <label for="showPassword" style="color: #a0a0a0; font-size: 14px; cursor: pointer;">Show Password</label>
+</div>
                 </div>
                 <button type="submit" class="btn btn-success w-100 fw-bold mb-3">LOGIN</button>
             </form>
@@ -22,4 +26,14 @@
         </div>
     </div>
 </div>
+<script>
+    function togglePassword() {
+        var passInput = document.getElementById("password");
+        if (passInput.type === "password") {
+            passInput.type = "text";
+        } else {
+            passInput.type = "password";
+        }
+    }
+</script>
 {% endblock %}
