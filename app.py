@@ -387,7 +387,7 @@ def dashboard():
         search_text=search,
         category=category
     )
-if session.get("role") == "ADMIN":
+    if session.get("role") == "ADMIN":
             items = InventoryController.get_all_items()
             pending_borrows = InventoryController.get_pending_borrows()
             pending_returns = InventoryController.get_pending_returns()
